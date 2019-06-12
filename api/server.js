@@ -4,33 +4,51 @@ const server = express();
 const bcrypt = require('bcryptjs')
 const db = require('../api/userModel.js')
 const jwt = require('jsonwebtoken')
+const restricted = require('./restricted.js')
+const secrets = require('./secrets.js')
 
 server.use(express.json());
+
+function generateToken(user) {
+    return jwt.sign({
+        userId: user.id,
+        userRole: user.department,
+    }, secrets.jwt, {
+        expiresIn: '1h'
+    })
+}
 
 server.get('/', (req, res) => {
   res.send("It's alive!");
 });
 
+server.get('/api/users', restricted, (req, res) => {
+    db.find()
+    .then(users => {
+        res.json(users)
+    })
+    .catch(err => 
+        res.send(err))
+})
+
 server.post('/api/register', (req, res) => {
-    let user = req.body
-    const hash = bcrypt.hashSynch(user.password, 12)
-    user.password = hash
+    let user = req.body;
+    const hash = bcrypt.hashSync(user.password, 12);
+    user.password = hash;
 
     db.add(user)
     .then(newUser => {
         const token = generateToken(newUser)
+        console.log(token)
 
-        res.status(201).json({
-            message: `Welcome ${newUser.username}`,
-            authToken: token
-        })
+        res.status(201).json(token)
     })
     .catch(err => {
         res.status(500).json({message: 'Could not register new user, please try again'})
     })
 })
 
-server.post('/login', (req, res) => {
+server.post('/api/login', (req, res) => {
     let { username, password} = req.body
 
     db.findBy({username})
@@ -51,13 +69,6 @@ server.post('/login', (req, res) => {
     })
 })
 
-function generateToken(user) {
-    return jwt.sign({
-        userId: user.id,
-        userRole: user.department,
-    }, secrets.jwt, {
-        expiresIn: '1h'
-    })
-}
+
 
 module.exports = server;
